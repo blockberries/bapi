@@ -6,13 +6,14 @@
 package counter
 
 import (
-	"bapi"
-	"bapi/types"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"sync"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/types"
 )
 
 // Compile-time interface check.

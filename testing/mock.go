@@ -4,11 +4,12 @@
 package bapitest
 
 import (
-	"bapi"
-	"bapi/types"
 	"context"
 	"sync"
 	"sync/atomic"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/types"
 )
 
 // Compile-time check that MockApp satisfies all interfaces.
@@ -34,19 +35,19 @@ type MockApp struct {
 	DeclaredCapabilities types.Capabilities
 
 	// Configurable handlers. If nil, defaults are used.
-	HandshakeFn       func(context.Context, types.HandshakeRequest) (types.HandshakeResponse, error)
-	CheckTxFn         func(context.Context, types.Tx, types.MempoolContext) (types.GateVerdict, error)
-	ExecuteBlockFn    func(context.Context, types.FinalizedBlock) (types.BlockOutcome, error)
-	CommitFn          func(context.Context) (types.CommitResult, error)
-	QueryFn           func(context.Context, types.StateQuery) (types.StateQueryResult, error)
-	BuildProposalFn   func(context.Context, types.ProposalContext) (types.BuiltProposal, error)
-	VerifyProposalFn  func(context.Context, types.ReceivedProposal) (types.ProposalVerdict, error)
-	ExtendVoteFn      func(context.Context, types.VoteContext) ([]byte, error)
-	VerifyExtensionFn func(context.Context, types.ReceivedExtension) (types.ExtensionVerdict, error)
+	HandshakeFn          func(context.Context, types.HandshakeRequest) (types.HandshakeResponse, error)
+	CheckTxFn            func(context.Context, types.Tx, types.MempoolContext) (types.GateVerdict, error)
+	ExecuteBlockFn       func(context.Context, types.FinalizedBlock) (types.BlockOutcome, error)
+	CommitFn             func(context.Context) (types.CommitResult, error)
+	QueryFn              func(context.Context, types.StateQuery) (types.StateQueryResult, error)
+	BuildProposalFn      func(context.Context, types.ProposalContext) (types.BuiltProposal, error)
+	VerifyProposalFn     func(context.Context, types.ReceivedProposal) (types.ProposalVerdict, error)
+	ExtendVoteFn         func(context.Context, types.VoteContext) ([]byte, error)
+	VerifyExtensionFn    func(context.Context, types.ReceivedExtension) (types.ExtensionVerdict, error)
 	AvailableSnapshotsFn func(context.Context) ([]types.SnapshotDescriptor, error)
-	ExportSnapshotFn  func(context.Context, uint64, uint32) (<-chan types.SnapshotChunk, *types.SnapshotDescriptor, error)
-	ImportSnapshotFn  func(context.Context, types.SnapshotDescriptor, <-chan types.SnapshotChunk) (types.ImportResult, error)
-	SimulateFn        func(context.Context, types.Tx) (types.TxOutcome, error)
+	ExportSnapshotFn     func(context.Context, uint64, uint32) (<-chan types.SnapshotChunk, *types.SnapshotDescriptor, error)
+	ImportSnapshotFn     func(context.Context, types.SnapshotDescriptor, <-chan types.SnapshotChunk) (types.ImportResult, error)
+	SimulateFn           func(context.Context, types.Tx) (types.TxOutcome, error)
 
 	// Call counters (atomic for concurrent access).
 	HandshakeCalls    atomic.Int64

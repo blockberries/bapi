@@ -1,11 +1,12 @@
 package counter
 
 import (
-	"bapi"
-	bapitest "bapi/testing"
-	"bapi/types"
 	"encoding/binary"
 	"testing"
+
+	"github.com/blockberries/bapi"
+	bapitest "github.com/blockberries/bapi/testing"
+	"github.com/blockberries/bapi/types"
 )
 
 func TestCounter_Compliance(t *testing.T) {

@@ -1,4 +1,4 @@
-module bapi
+module github.com/blockberries/bapi
 
 go 1.25.6
 

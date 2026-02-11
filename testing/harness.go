@@ -1,12 +1,13 @@
 package bapitest
 
 import (
-	"bapi"
-	"bapi/server"
-	"bapi/types"
 	"context"
 	"testing"
 	"time"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/server"
+	"github.com/blockberries/bapi/types"
 )
 
 // Harness provides a convenient test harness for application

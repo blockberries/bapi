@@ -1,6 +1,6 @@
 package bapigrpc
 
-import "bapi/types"
+import "github.com/blockberries/bapi/types"
 
 // Transport-specific wrapper types for RPC methods whose interface
 // signatures don't map to a single request/response struct.
@@ -8,7 +8,7 @@ import "bapi/types"
 
 // CheckTxRequest wraps the parameters for Lifecycle.CheckTx.
 type CheckTxRequest struct {
-	Tx      types.Tx            `cramberry:"1"`
+	Tx      types.Tx             `cramberry:"1"`
 	Context types.MempoolContext `cramberry:"2"`
 }
 

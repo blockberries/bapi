@@ -7,10 +7,11 @@
 package local
 
 import (
-	"bapi"
-	"bapi/server"
-	"bapi/types"
 	"context"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/server"
+	"github.com/blockberries/bapi/types"
 )
 
 // Compile-time interface check.

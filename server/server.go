@@ -1,12 +1,13 @@
 package server
 
 import (
-	"bapi"
-	"bapi/types"
 	"context"
 	"fmt"
 	"log"
 	"sync"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/types"
 )
 
 // Server wraps a BAPI application with lifecycle enforcement
@@ -121,7 +122,7 @@ func (s *Server) Capabilities() types.Capabilities {
 // BuildProposal delegates to ProposalControl if supported.
 func (s *Server) BuildProposal(ctx context.Context, pctx types.ProposalContext) (types.BuiltProposal, error) {
 	if s.proposalCtl == nil {
-		return types.BuiltProposal{}, fmt.Errorf("bapi: ProposalControl not supported")
+		return types.BuiltProposal{}, fmt.Errorf("github.com/blockberries/bapi: ProposalControl not supported")
 	}
 	return s.proposalCtl.BuildProposal(ctx, pctx)
 }
@@ -138,7 +139,7 @@ func (s *Server) VerifyProposal(ctx context.Context, prop types.ReceivedProposal
 // ExtendVote delegates to VoteExtender if supported.
 func (s *Server) ExtendVote(ctx context.Context, vctx types.VoteContext) ([]byte, error) {
 	if s.voteExt == nil {
-		return nil, fmt.Errorf("bapi: VoteExtender not supported")
+		return nil, fmt.Errorf("github.com/blockberries/bapi: VoteExtender not supported")
 	}
 	return s.voteExt.ExtendVote(ctx, vctx)
 }
@@ -155,7 +156,7 @@ func (s *Server) VerifyExtension(ctx context.Context, ext types.ReceivedExtensio
 // AvailableSnapshots delegates to StateSync if supported.
 func (s *Server) AvailableSnapshots(ctx context.Context) ([]types.SnapshotDescriptor, error) {
 	if s.stateSync == nil {
-		return nil, fmt.Errorf("bapi: StateSync not supported")
+		return nil, fmt.Errorf("github.com/blockberries/bapi: StateSync not supported")
 	}
 	return s.stateSync.AvailableSnapshots(ctx)
 }
@@ -163,7 +164,7 @@ func (s *Server) AvailableSnapshots(ctx context.Context) ([]types.SnapshotDescri
 // ExportSnapshot delegates to StateSync if supported.
 func (s *Server) ExportSnapshot(ctx context.Context, height uint64, format uint32) (<-chan types.SnapshotChunk, *types.SnapshotDescriptor, error) {
 	if s.stateSync == nil {
-		return nil, nil, fmt.Errorf("bapi: StateSync not supported")
+		return nil, nil, fmt.Errorf("github.com/blockberries/bapi: StateSync not supported")
 	}
 	return s.stateSync.ExportSnapshot(ctx, height, format)
 }
@@ -171,7 +172,7 @@ func (s *Server) ExportSnapshot(ctx context.Context, height uint64, format uint3
 // ImportSnapshot delegates to StateSync if supported.
 func (s *Server) ImportSnapshot(ctx context.Context, desc types.SnapshotDescriptor, chunks <-chan types.SnapshotChunk) (types.ImportResult, error) {
 	if s.stateSync == nil {
-		return types.ImportResult{}, fmt.Errorf("bapi: StateSync not supported")
+		return types.ImportResult{}, fmt.Errorf("github.com/blockberries/bapi: StateSync not supported")
 	}
 	return s.stateSync.ImportSnapshot(ctx, desc, chunks)
 }
@@ -180,7 +181,7 @@ func (s *Server) ImportSnapshot(ctx context.Context, desc types.SnapshotDescript
 // Safe for concurrent use.
 func (s *Server) Simulate(ctx context.Context, tx types.Tx) (types.TxOutcome, error) {
 	if s.simulator == nil {
-		return types.TxOutcome{}, fmt.Errorf("bapi: Simulator not supported")
+		return types.TxOutcome{}, fmt.Errorf("github.com/blockberries/bapi: Simulator not supported")
 	}
 	s.guard.CheckConcurrent()
 	return s.simulator.Simulate(ctx, tx)
@@ -238,30 +239,30 @@ func discoverCapabilities(app bapi.Lifecycle, declared types.Capabilities) error
 	_, hasSimulator := app.(bapi.Simulator)
 
 	if declared.Has(types.CapProposalControl) && !hasProposal {
-		return fmt.Errorf("bapi: app declared CapProposalControl but does not implement ProposalControl")
+		return fmt.Errorf("github.com/blockberries/bapi: app declared CapProposalControl but does not implement ProposalControl")
 	}
 	if declared.Has(types.CapVoteExtensions) && !hasVoteExt {
-		return fmt.Errorf("bapi: app declared CapVoteExtensions but does not implement VoteExtender")
+		return fmt.Errorf("github.com/blockberries/bapi: app declared CapVoteExtensions but does not implement VoteExtender")
 	}
 	if declared.Has(types.CapStateSync) && !hasStateSync {
-		return fmt.Errorf("bapi: app declared CapStateSync but does not implement StateSync")
+		return fmt.Errorf("github.com/blockberries/bapi: app declared CapStateSync but does not implement StateSync")
 	}
 	if declared.Has(types.CapSimulation) && !hasSimulator {
-		return fmt.Errorf("bapi: app declared CapSimulation but does not implement Simulator")
+		return fmt.Errorf("github.com/blockberries/bapi: app declared CapSimulation but does not implement Simulator")
 	}
 
 	// Warn (but don't error) if the app implements an interface but didn't declare it.
 	if !declared.Has(types.CapProposalControl) && hasProposal {
-		log.Println("bapi: WARNING: app implements ProposalControl but did not declare it; capability will not be used")
+		log.Println("github.com/blockberries/bapi: WARNING: app implements ProposalControl but did not declare it; capability will not be used")
 	}
 	if !declared.Has(types.CapVoteExtensions) && hasVoteExt {
-		log.Println("bapi: WARNING: app implements VoteExtender but did not declare it; capability will not be used")
+		log.Println("github.com/blockberries/bapi: WARNING: app implements VoteExtender but did not declare it; capability will not be used")
 	}
 	if !declared.Has(types.CapStateSync) && hasStateSync {
-		log.Println("bapi: WARNING: app implements StateSync but did not declare it; capability will not be used")
+		log.Println("github.com/blockberries/bapi: WARNING: app implements StateSync but did not declare it; capability will not be used")
 	}
 	if !declared.Has(types.CapSimulation) && hasSimulator {
-		log.Println("bapi: WARNING: app implements Simulator but did not declare it; capability will not be used")
+		log.Println("github.com/blockberries/bapi: WARNING: app implements Simulator but did not declare it; capability will not be used")
 	}
 
 	return nil

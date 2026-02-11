@@ -1,10 +1,11 @@
 package server
 
 import (
-	"bapi"
-	"bapi/types"
 	"context"
 	"testing"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/types"
 )
 
 // testApp is a minimal mock that implements all BAPI interfaces

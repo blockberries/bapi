@@ -76,7 +76,7 @@ func (g *LifecycleGuard) State() string {
 // Panics if not in Init state.
 func (g *LifecycleGuard) AcquireHandshake() {
 	if !g.state.CompareAndSwap(uint32(stateInit), uint32(stateReady)) {
-		panic(fmt.Sprintf("bapi: Handshake called in state %s (expected Init)",
+		panic(fmt.Sprintf("github.com/blockberries/bapi: Handshake called in state %s (expected Init)",
 			lifecycleState(g.state.Load())))
 	}
 }
@@ -98,7 +98,7 @@ func (g *LifecycleGuard) AcquireExecute() {
 	g.seqMu.Lock()
 	if state := lifecycleState(g.state.Load()); state != stateReady {
 		g.seqMu.Unlock()
-		panic(fmt.Sprintf("bapi: ExecuteBlock called in state %s (expected Ready)", state))
+		panic(fmt.Sprintf("github.com/blockberries/bapi: ExecuteBlock called in state %s (expected Ready)", state))
 	}
 	g.state.Store(uint32(stateExecuting))
 }
@@ -121,7 +121,7 @@ func (g *LifecycleGuard) AcquireCommit() {
 	g.seqMu.Lock()
 	if state := lifecycleState(g.state.Load()); state != stateExecuted {
 		g.seqMu.Unlock()
-		panic(fmt.Sprintf("bapi: Commit called in state %s (expected Executed)", state))
+		panic(fmt.Sprintf("github.com/blockberries/bapi: Commit called in state %s (expected Executed)", state))
 	}
 	g.state.Store(uint32(stateCommitting))
 }
@@ -136,7 +136,7 @@ func (g *LifecycleGuard) CompleteCommit() {
 // (any state after Handshake). Panics if handshake has not completed.
 func (g *LifecycleGuard) CheckConcurrent() {
 	if !g.handshakeDone.Load() {
-		panic("bapi: concurrent call before Handshake completed")
+		panic("github.com/blockberries/bapi: concurrent call before Handshake completed")
 	}
 }
 

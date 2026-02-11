@@ -1,11 +1,12 @@
 package local
 
 import (
-	"bapi/example/counter"
-	"bapi/types"
 	"context"
 	"encoding/binary"
 	"testing"
+
+	"github.com/blockberries/bapi/example/counter"
+	"github.com/blockberries/bapi/types"
 )
 
 func TestLocalConnection_FullCycle(t *testing.T) {

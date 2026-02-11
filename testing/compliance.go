@@ -1,11 +1,12 @@
 package bapitest
 
 import (
-	"bapi"
-	"bapi/types"
 	"context"
 	"sync"
 	"testing"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/types"
 )
 
 // RunComplianceSuite runs a standard compliance test suite against

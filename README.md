@@ -14,8 +14,8 @@ Every BAPI application must implement `Lifecycle`:
 package myapp
 
 import (
-    "bapi"
-    "bapi/types"
+    "github.com/blockberries/bapi"
+    "github.com/blockberries/bapi/types"
     "context"
 )
 
@@ -54,7 +54,7 @@ func (a *App) Query(ctx context.Context, req types.StateQuery) (types.StateQuery
 ### Connect In-Process
 
 ```go
-import "bapi/local"
+import "github.com/blockberries/bapi/local"
 
 conn := local.NewConnection(&App{})
 defer conn.Close()
@@ -67,7 +67,7 @@ resp, err := conn.Handshake(ctx, types.HandshakeRequest{
 ### Connect Over gRPC
 
 ```go
-import bapigrpc "bapi/grpc"
+import bapigrpc "github.com/blockberries/bapi/grpc"
 
 // Server
 gs := grpc.NewServer()
@@ -137,7 +137,7 @@ The engine validates at handshake that declared capabilities match implemented i
 A minimal application that counts transactions. Demonstrates `Lifecycle` with no optional capabilities.
 
 ```go
-import "bapi/example/counter"
+import "github.com/blockberries/bapi/example/counter"
 
 app := counter.New()
 conn := local.NewConnection(app)
@@ -150,7 +150,7 @@ See [`example/counter/app.go`](example/counter/app.go).
 A decentralized exchange demonstrating all optional capabilities: proposal control (oracle price injection), vote extensions (price feeds), state sync (JSON snapshots), and simulation (dry-run execution).
 
 ```go
-import "bapi/example/dex"
+import "github.com/blockberries/bapi/example/dex"
 
 app := dex.New()
 conn := local.NewConnection(app)
@@ -172,7 +172,7 @@ make test-race     # with race detector
 The `testing/` package provides tools for testing your application:
 
 ```go
-import bapitest "bapi/testing"
+import bapitest "github.com/blockberries/bapi/testing"
 
 func TestMyApp(t *testing.T) {
     app := myapp.New()

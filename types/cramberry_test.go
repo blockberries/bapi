@@ -1,9 +1,10 @@
 package types_test
 
 import (
-	"bapi/types"
 	"testing"
 	"time"
+
+	"github.com/blockberries/bapi/types"
 
 	"github.com/blockberries/cramberry/pkg/cramberry"
 )

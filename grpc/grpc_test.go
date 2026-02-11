@@ -1,14 +1,15 @@
 package bapigrpc_test
 
 import (
-	"bapi/example/counter"
-	"bapi/example/dex"
-	bapigrpc "bapi/grpc"
-	"bapi/types"
 	"context"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/blockberries/bapi/example/counter"
+	"github.com/blockberries/bapi/example/dex"
+	bapigrpc "github.com/blockberries/bapi/grpc"
+	"github.com/blockberries/bapi/types"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

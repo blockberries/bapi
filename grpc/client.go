@@ -1,12 +1,13 @@
 package bapigrpc
 
 import (
-	"bapi"
-	"bapi/server"
-	"bapi/types"
 	"context"
 	"fmt"
 	"io"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/server"
+	"github.com/blockberries/bapi/types"
 
 	"google.golang.org/grpc"
 )
@@ -30,7 +31,7 @@ func Dial(ctx context.Context, addr string, opts ...grpc.DialOption) (*Client, e
 	))
 	cc, err := grpc.DialContext(ctx, addr, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("bapi client: dial %s: %w", addr, err)
+		return nil, fmt.Errorf("github.com/blockberries/bapi client: dial %s: %w", addr, err)
 	}
 	return &Client{
 		cc:    cc,
@@ -197,7 +198,7 @@ func (w *clientStateSync) AvailableSnapshots(ctx context.Context) ([]types.Snaps
 func (w *clientStateSync) ExportSnapshot(ctx context.Context, height uint64, format uint32) (<-chan types.SnapshotChunk, *types.SnapshotDescriptor, error) {
 	req := &ExportSnapshotRequest{Height: height, Format: format}
 	stream, err := w.c.cc.NewStream(ctx, &grpc.StreamDesc{
-		StreamName:   "ExportSnapshot",
+		StreamName:    "ExportSnapshot",
 		ServerStreams: true,
 	}, fullMethod("ExportSnapshot"))
 	if err != nil {
@@ -232,7 +233,7 @@ func (w *clientStateSync) ExportSnapshot(ctx context.Context, height uint64, for
 
 func (w *clientStateSync) ImportSnapshot(ctx context.Context, desc types.SnapshotDescriptor, chunks <-chan types.SnapshotChunk) (types.ImportResult, error) {
 	stream, err := w.c.cc.NewStream(ctx, &grpc.StreamDesc{
-		StreamName:   "ImportSnapshot",
+		StreamName:    "ImportSnapshot",
 		ClientStreams: true,
 	}, fullMethod("ImportSnapshot"))
 	if err != nil {

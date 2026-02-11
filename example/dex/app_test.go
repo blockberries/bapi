@@ -1,12 +1,13 @@
 package dex
 
 import (
-	"bapi"
-	bapitest "bapi/testing"
-	"bapi/types"
 	"context"
 	"encoding/binary"
 	"testing"
+
+	"github.com/blockberries/bapi"
+	bapitest "github.com/blockberries/bapi/testing"
+	"github.com/blockberries/bapi/types"
 )
 
 func TestDex_Compliance(t *testing.T) {

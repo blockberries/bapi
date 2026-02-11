@@ -1,13 +1,14 @@
 package bapigrpc
 
 import (
-	"bapi"
-	"bapi/server"
-	"bapi/types"
 	"context"
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/server"
+	"github.com/blockberries/bapi/types"
 
 	"google.golang.org/grpc"
 )
@@ -159,7 +160,7 @@ func (s *GRPCServer) ImportSnapshot(stream grpc.ServerStream) error {
 		return err
 	}
 	if first.Descriptor == nil {
-		return fmt.Errorf("bapi grpc: first ImportSnapshot message must contain a descriptor")
+		return fmt.Errorf("github.com/blockberries/bapi grpc: first ImportSnapshot message must contain a descriptor")
 	}
 
 	desc := *first.Descriptor

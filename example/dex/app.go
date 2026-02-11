@@ -13,8 +13,6 @@
 package dex
 
 import (
-	"bapi"
-	"bapi/types"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -22,6 +20,9 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/blockberries/bapi"
+	"github.com/blockberries/bapi/types"
 )
 
 // Tx type prefix bytes.
@@ -50,18 +51,18 @@ type OraclePrice struct {
 // Order represents a limit order on the book.
 type Order struct {
 	Owner  types.ValidatorAddress `json:"owner"`
-	Pair   string                `json:"pair"`
-	Amount uint64                `json:"amount"`
-	Price  uint64                `json:"price"`
+	Pair   string                 `json:"pair"`
+	Amount uint64                 `json:"amount"`
+	Price  uint64                 `json:"price"`
 }
 
 // state holds the entire application state, designed for easy
 // JSON serialization for state sync.
 type state struct {
-	Height   uint64                                  `json:"height"`
-	Balances map[string]map[string]uint64            `json:"balances"` // address-hex -> denom -> amount
-	Orders   []Order                                 `json:"orders"`
-	Prices   map[string]uint64                       `json:"prices"` // pair -> price
+	Height   uint64                       `json:"height"`
+	Balances map[string]map[string]uint64 `json:"balances"` // address-hex -> denom -> amount
+	Orders   []Order                      `json:"orders"`
+	Prices   map[string]uint64            `json:"prices"` // pair -> price
 }
 
 func newState() *state {

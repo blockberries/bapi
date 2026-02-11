@@ -7,8 +7,9 @@
 package bapi
 
 import (
-	"bapi/types"
 	"context"
+
+	"github.com/blockberries/bapi/types"
 )
 
 // Lifecycle is the core interface every BAPI application must implement.

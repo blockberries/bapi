@@ -1,14 +1,15 @@
 package bapigrpc
 
 import (
-	"bapi/types"
 	"context"
 	"fmt"
+
+	"github.com/blockberries/bapi/types"
 
 	"google.golang.org/grpc"
 )
 
-const serviceName = "bapi.v1.BAPIService"
+const serviceName = "github.com/blockberries/bapi.v1.BAPIService"
 
 // BAPIServiceServer is the server-side interface for the BAPI gRPC service.
 type BAPIServiceServer interface {
@@ -160,15 +161,15 @@ var serviceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "ExportSnapshot",
 			Handler:       handlerExportSnapshot,
-			ServerStreams:  true,
-			ClientStreams:  false,
+			ServerStreams: true,
+			ClientStreams: false,
 		},
 		{
 			StreamName:    "ImportSnapshot",
 			Handler:       handlerImportSnapshot,
-			ServerStreams:  false,
-			ClientStreams:  true,
+			ServerStreams: false,
+			ClientStreams: true,
 		},
 	},
-	Metadata: "bapi/v1/service.cram",
+	Metadata: "github.com/blockberries/bapi/v1/service.cram",
 }
