@@ -1,0 +1,247 @@
+// BAPI v1 — Cramberry type schema
+//
+// This file documents the wire-format field assignments for all
+// domain types. It is the cross-language source of truth; Go
+// struct tags in bapi/types must match these assignments exactly.
+//
+// Field numbering rules:
+//   - Fields within a message are numbered sequentially from 1.
+//   - Once assigned, a field number MUST NOT be reused.
+//   - Deprecated fields are reserved (not re-assigned).
+//
+// Note: cramberry uses OmitEmpty by default. Fields with zero values
+// are omitted from the wire. Do not use "required" for fields where
+// the zero value is semantically valid (e.g., Code=0 means success).
+
+// --- Primitives (serialized as underlying types) ---
+// Hash          = fixed [32]byte
+// AppHash       = fixed [32]byte
+// Tx            = bytes
+// QueryPath     = string
+// ValidatorAddress = fixed [20]byte
+// Capabilities  = uint8
+// MempoolContext = uint8
+// EvidenceType  = uint8
+// ExtensionVerdict = uint8
+// ImportStatus  = uint8
+// KeyType       = uint8
+
+// --- Time ---
+
+message Timestamp {
+  1: int64  seconds;
+  2: int32  nanos;
+}
+
+message Duration {
+  1: int64  nanos;
+}
+
+// --- Core Types ---
+
+message BlockID {
+  1: uint64  height;
+  2: Hash    hash;
+}
+
+message EventAttribute {
+  1: string  key;
+  2: string  value;
+  3: bool    index;
+}
+
+message Event {
+  1: string            kind;
+  2: []EventAttribute  attributes;
+}
+
+message PublicKey {
+  1: KeyType  type;
+  2: bytes    data;
+}
+
+message ValidatorUpdate {
+  1: PublicKey  pub_key;
+  2: uint64    power;
+}
+
+// --- Handshake ---
+
+message HandshakeRequest {
+  1: *BlockID     last_committed;
+  2: *GenesisDoc  genesis;
+}
+
+message HandshakeResponse {
+  1: *BlockID      last_block;
+  2: *AppHash      app_hash;
+  3: Capabilities  capabilities;
+}
+
+// --- Block Execution ---
+
+message TxOutcome {
+  1: uint32   index;
+  2: uint32   code;
+  3: string   info;
+  4: bytes    data;
+  5: []Event  events;
+}
+
+message BlockOutcome {
+  1: []TxOutcome        tx_outcomes;
+  2: []Event            block_events;
+  3: AppHash            app_hash;
+  4: []ValidatorUpdate  validator_updates;
+  5: *ConsensusParams   params_update;
+}
+
+message FinalizedBlock {
+  1: uint64                    height;
+  2: Timestamp                 time;
+  3: ValidatorAddress          proposer;
+  4: []Tx                      txs;
+  5: Hash                      last_block_hash;
+  6: []Evidence                evidence;
+  7: []CommittedVoteExtension  vote_extensions;
+}
+
+message CommitResult {
+  1: uint64  retain_height;
+}
+
+// --- Mempool ---
+
+message GateVerdict {
+  1: uint32  code;
+  2: string  info;
+  3: int64   priority;
+  4: string  sender;
+}
+
+// --- Proposals ---
+
+message ProposalContext {
+  1: uint64                    height;
+  2: Timestamp                 time;
+  3: ValidatorAddress          proposer;
+  4: []Tx                      mempool_txs;
+  5: uint64                    max_tx_bytes;
+  6: []CommittedVoteExtension  vote_extensions;
+}
+
+message BuiltProposal {
+  1: []Tx  txs;
+}
+
+message ReceivedProposal {
+  1: uint64                    height;
+  2: Timestamp                 time;
+  3: ValidatorAddress          proposer;
+  4: []Tx                      txs;
+  5: []CommittedVoteExtension  vote_extensions;
+}
+
+message ProposalVerdict {
+  1: bool    accept;
+  2: string  reject_reason;
+}
+
+// --- Vote Extensions ---
+
+message VoteContext {
+  1: uint64  height;
+  2: uint32  round;
+  3: Hash    block_hash;
+}
+
+message ReceivedExtension {
+  1: uint64            height;
+  2: uint32            round;
+  3: ValidatorAddress  validator;
+  4: bytes             extension;
+}
+
+message CommittedVoteExtension {
+  1: ValidatorAddress  validator;
+  2: bytes             extension;
+}
+
+// --- Queries ---
+
+message StateQuery {
+  1: QueryPath     path;
+  2: bytes         data;
+  3: *uint64       height;
+  4: bool          prove;
+}
+
+message StateQueryResult {
+  1: uint32        code;
+  2: bytes         key;
+  3: bytes         value;
+  4: uint64        height;
+  5: *MerkleProof  proof;
+  6: string        info;
+}
+
+message MerkleProof {
+  1: []ProofOp  ops;
+}
+
+message ProofOp {
+  1: string  type;
+  2: bytes   key;
+  3: bytes   data;
+}
+
+// --- Genesis ---
+
+message GenesisDoc {
+  1: string            chain_id;
+  2: Timestamp         genesis_time;
+  3: uint64            initial_height;
+  4: ConsensusParams   consensus_params;
+  5: []ValidatorUpdate validators;
+  6: bytes             app_state;
+}
+
+// --- Evidence ---
+
+message Evidence {
+  1: EvidenceType      type;
+  2: ValidatorAddress  validator;
+  3: uint64            height;
+  4: Timestamp         time;
+  5: uint64            total_voting_power;
+}
+
+// --- Params ---
+
+message ConsensusParams {
+  1: uint64    max_block_bytes;
+  2: Duration  max_evidence_age;
+  3: uint64    max_tx_bytes;
+}
+
+// --- Snapshots ---
+
+message SnapshotDescriptor {
+  1: uint64  height;
+  2: uint32  format;
+  3: uint32  chunks;
+  4: Hash    hash;
+  5: bytes   metadata;
+}
+
+message SnapshotChunk {
+  1: uint32  index;
+  2: bytes   data;
+}
+
+message ImportResult {
+  1: ImportStatus  status;
+  2: *AppHash      app_hash;
+  3: string        reason;
+  4: []uint32      retry_indices;
+}

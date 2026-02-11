@@ -1,0 +1,72 @@
+// BAPI v1 — Cramberry service schema
+//
+// Defines the gRPC service for BAPI. This file documents the
+// RPC methods and their request/response types. The actual Go
+// implementation uses a manual grpc.ServiceDesc (no codegen).
+
+service BAPIService {
+  // --- Lifecycle (required) ---
+
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
+  rpc CheckTx(CheckTxRequest) returns (GateVerdict);
+  rpc ExecuteBlock(FinalizedBlock) returns (BlockOutcome);
+  rpc Commit(CommitRequest) returns (CommitResult);
+  rpc Query(StateQuery) returns (StateQueryResult);
+
+  // --- ProposalControl (optional: CapProposalControl) ---
+
+  rpc BuildProposal(ProposalContext) returns (BuiltProposal);
+  rpc VerifyProposal(ReceivedProposal) returns (ProposalVerdict);
+
+  // --- VoteExtender (optional: CapVoteExtensions) ---
+
+  rpc ExtendVote(VoteContext) returns (ExtendVoteResponse);
+  rpc VerifyExtension(ReceivedExtension) returns (ExtensionVerdictResponse);
+
+  // --- StateSync (optional: CapStateSync) ---
+
+  rpc AvailableSnapshots(AvailableSnapshotsRequest) returns (AvailableSnapshotsResponse);
+  rpc ExportSnapshot(ExportSnapshotRequest) returns (stream SnapshotChunk);
+  rpc ImportSnapshot(stream ImportSnapshotMessage) returns (ImportResult);
+
+  // --- Simulator (optional: CapSimulation) ---
+
+  rpc Simulate(SimulateRequest) returns (TxOutcome);
+}
+
+// --- Wire-only types (not in bapi/types, defined in grpc/wire.go) ---
+
+message CheckTxRequest {
+  1: Tx              tx;
+  2: MempoolContext  context;
+}
+
+message CommitRequest {}
+
+message ExtendVoteResponse {
+  1: bytes  extension;
+}
+
+message ExtensionVerdictResponse {
+  1: ExtensionVerdict  verdict;
+}
+
+message AvailableSnapshotsRequest {}
+
+message AvailableSnapshotsResponse {
+  1: []SnapshotDescriptor  snapshots;
+}
+
+message ExportSnapshotRequest {
+  1: uint64  height;
+  2: uint32  format;
+}
+
+message ImportSnapshotMessage {
+  1: *SnapshotDescriptor  descriptor;
+  2: *SnapshotChunk       chunk;
+}
+
+message SimulateRequest {
+  1: Tx  tx;
+}

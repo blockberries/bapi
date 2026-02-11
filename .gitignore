@@ -1,0 +1,46 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+blockberryd
+CLAUDE.md
+.claude
+# Test binaries
+*.test
+
+# Example binaries
+examples/*/basic
+examples/*/simple-chat
+examples/*/*.key
+examples/*/addressbook.json
+examples/*/addrbook.json
+
+# Address books (but not example configs)
+addressbook.json
+
+# Data directories
+data/
+
+# Node keys
+node_key.json
+*.key
+
+# Coverage
+*.out
+coverage.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vendor (if using)
+vendor/
