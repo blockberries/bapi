@@ -142,6 +142,23 @@ func (c *Client) AsSimulator() bapi.Simulator {
 	return nil
 }
 
+// AsMempoolObserver returns the MempoolObserver interface if the
+// remote app declared CapMempoolObserver, else nil.
+//
+// The gRPC wire schema for OnBatchCertified / OnBlockConstructed is
+// not yet generated — this wrapper returns an error stub. The
+// in-process local.Connection path is the supported transport for
+// Phase 0.2. Schema regeneration happens as part of Phase 0.3 when
+// raspberry's adapter starts firing the events; until then a remote
+// gRPC app declaring CapMempoolObserver will get errors on every
+// callback. See PLAN §7 Phase 0.
+func (c *Client) AsMempoolObserver() bapi.MempoolObserver {
+	if c.caps.Has(types.CapMempoolObserver) {
+		return &clientMempoolObserver{c}
+	}
+	return nil
+}
+
 // --- ProposalControl wrapper ---
 
 type clientProposalControl struct{ c *Client }
@@ -275,4 +292,25 @@ func (w *clientSimulator) Simulate(ctx context.Context, tx types.Tx) (types.TxOu
 		return types.TxOutcome{}, err
 	}
 	return *resp, nil
+}
+
+// --- MempoolObserver wrapper ---
+//
+// Placeholder: the gRPC wire schema for OnBatchCertified /
+// OnBlockConstructed is not yet generated. In-process local.Connection
+// is the supported transport for Phase 0.2; gRPC schema regen lands in
+// Phase 0.3 when raspberry's adapter starts firing the events.
+//
+// Until then, both methods return ErrUnimplemented so a misconfigured
+// remote-gRPC setup fails loudly rather than silently swallowing
+// events. See PLAN §7 Phase 0.
+
+type clientMempoolObserver struct{ c *Client }
+
+func (w *clientMempoolObserver) OnBatchCertified(ctx context.Context, ev types.BatchCertifiedEvent) error {
+	return fmt.Errorf("MempoolObserver.OnBatchCertified over gRPC not yet wired (PLAN Phase 0.3)")
+}
+
+func (w *clientMempoolObserver) OnBlockConstructed(ctx context.Context, ev types.BlockConstructedEvent) error {
+	return fmt.Errorf("MempoolObserver.OnBlockConstructed over gRPC not yet wired (PLAN Phase 0.3)")
 }

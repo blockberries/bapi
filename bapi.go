@@ -178,6 +178,47 @@ type Simulator interface {
 	Simulate(ctx context.Context, tx types.Tx) (types.TxOutcome, error)
 }
 
+// MempoolObserver lets the application observe mempool / block-construction
+// events fired by the consensus engine. The methods are notifications,
+// not requests — the engine continues regardless of what they return,
+// but a non-nil error MAY be logged for diagnostics.
+//
+// The primary consumer is a tokenomics participation tracker that
+// counts batches-certified-per-validator and leader-blocks-per-validator
+// per epoch, then feeds those counts into reward distribution. Other
+// consumers may attach later.
+//
+// Methods MUST be safe for concurrent use — the engine may fire
+// callbacks from multiple goroutines. They MUST also be deterministic
+// in the sense that all honest replicas observe the same sequence of
+// events for the same chain history; the engine guarantees this, but
+// the application must not introduce its own nondeterminism (e.g., by
+// observing wall-clock time in the handler).
+//
+// Declared via: types.CapMempoolObserver in HandshakeResponse.Capabilities
+type MempoolObserver interface {
+	// OnBatchCertified is called when a mempool batch reaches
+	// cert-quorum — that is, the header referencing this batch was
+	// vote-certified into a DAG round cert. (Not the earlier
+	// ack-quorum gate.) Cert-quorum is the durable, committed-to-DAG
+	// event.
+	//
+	// PLAN §7 decision D10 / D15. The payload is intentionally
+	// narrow: validator + batch hash + round + tx/byte counts. Full
+	// batch contents are not carried; consumers must look up by
+	// BatchHash if needed.
+	OnBatchCertified(ctx context.Context, ev types.BatchCertifiedEvent) error
+
+	// OnBlockConstructed is called when the consensus engine
+	// assembles a block (after proposal building, before broadcast).
+	// Conceptually fires once per (height, leader) pair.
+	//
+	// Tokenomics participation trackers credit leader_blocks only
+	// when `len(ev.IncludedBatchHashes) >= 1` — per PLAN §7
+	// decision D11, an empty-block proposal earns no leader credit.
+	OnBlockConstructed(ctx context.Context, ev types.BlockConstructedEvent) error
+}
+
 // Application is a convenience interface that embeds all BAPI
 // interfaces. Applications that support all capabilities may implement
 // this directly. Most applications should implement only Lifecycle plus
@@ -188,6 +229,7 @@ type Application interface {
 	VoteExtender
 	StateSync
 	Simulator
+	MempoolObserver
 }
 
 // Connection represents a transport-agnostic connection to a BAPI
@@ -211,6 +253,10 @@ type Connection interface {
 
 	// AsSimulator returns the Simulator interface if available.
 	AsSimulator() Simulator
+
+	// AsMempoolObserver returns the MempoolObserver interface if
+	// available, or nil if the app does not support it.
+	AsMempoolObserver() MempoolObserver
 
 	// Close terminates the connection.
 	Close() error

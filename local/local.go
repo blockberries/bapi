@@ -69,6 +69,10 @@ func (c *Connection) AsSimulator() bapi.Simulator {
 	return c.srv.AsSimulator()
 }
 
+func (c *Connection) AsMempoolObserver() bapi.MempoolObserver {
+	return c.srv.AsMempoolObserver()
+}
+
 func (c *Connection) Close() error { return nil }
 
 // Server returns the underlying server for advanced use cases.

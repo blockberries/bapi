@@ -13,6 +13,10 @@ import (
 type testApp struct {
 	caps           types.Capabilities
 	handshakeCalls int
+	// MempoolObserver call counts — tests use these to assert
+	// the server dispatched correctly.
+	batchCertifiedCalls   int
+	blockConstructedCalls int
 }
 
 var (
@@ -21,6 +25,7 @@ var (
 	_ bapi.VoteExtender    = (*testApp)(nil)
 	_ bapi.StateSync       = (*testApp)(nil)
 	_ bapi.Simulator       = (*testApp)(nil)
+	_ bapi.MempoolObserver = (*testApp)(nil)
 )
 
 func (a *testApp) Handshake(_ context.Context, _ types.HandshakeRequest) (types.HandshakeResponse, error) {
@@ -86,6 +91,16 @@ func (a *testApp) ImportSnapshot(_ context.Context, _ types.SnapshotDescriptor, 
 
 func (a *testApp) Simulate(_ context.Context, _ types.Tx) (types.TxOutcome, error) {
 	return types.TxOutcome{Code: 0}, nil
+}
+
+func (a *testApp) OnBatchCertified(_ context.Context, _ types.BatchCertifiedEvent) error {
+	a.batchCertifiedCalls++
+	return nil
+}
+
+func (a *testApp) OnBlockConstructed(_ context.Context, _ types.BlockConstructedEvent) error {
+	a.blockConstructedCalls++
+	return nil
 }
 
 // --- Tests ---
@@ -215,12 +230,15 @@ func TestServer_CapabilityGating(t *testing.T) {
 	if srv.AsSimulator() != nil {
 		t.Error("expected nil Simulator when not declared")
 	}
+	if srv.AsMempoolObserver() != nil {
+		t.Error("expected nil MempoolObserver when not declared")
+	}
 }
 
 func TestServer_CapabilityFullAccess(t *testing.T) {
 	app := &testApp{
 		caps: types.CapProposalControl | types.CapVoteExtensions |
-			types.CapStateSync | types.CapSimulation,
+			types.CapStateSync | types.CapSimulation | types.CapMempoolObserver,
 	}
 	srv := New(app)
 
@@ -243,4 +261,58 @@ func TestServer_CapabilityFullAccess(t *testing.T) {
 	if srv.AsSimulator() == nil {
 		t.Error("expected non-nil Simulator")
 	}
+	if srv.AsMempoolObserver() == nil {
+		t.Error("expected non-nil MempoolObserver")
+	}
+}
+
+// TestServer_MempoolObserverDispatch pins that the server dispatches
+// OnBatchCertified / OnBlockConstructed to the app exactly once per
+// call when the capability is declared, and is a no-op error-free
+// when it isn't.
+func TestServer_MempoolObserverDispatch(t *testing.T) {
+	t.Run("declared capability — dispatches", func(t *testing.T) {
+		app := &testApp{caps: types.CapMempoolObserver}
+		srv := New(app)
+		if _, err := srv.Handshake(context.Background(),
+			types.HandshakeRequest{Genesis: &types.GenesisDoc{ChainID: "test"}}); err != nil {
+			t.Fatalf("handshake: %v", err)
+		}
+		if err := srv.OnBatchCertified(context.Background(),
+			types.BatchCertifiedEvent{Round: 5, TxCount: 100}); err != nil {
+			t.Fatalf("OnBatchCertified: %v", err)
+		}
+		if err := srv.OnBlockConstructed(context.Background(),
+			types.BlockConstructedEvent{Height: 10}); err != nil {
+			t.Fatalf("OnBlockConstructed: %v", err)
+		}
+		if app.batchCertifiedCalls != 1 {
+			t.Errorf("batchCertifiedCalls = %d, want 1", app.batchCertifiedCalls)
+		}
+		if app.blockConstructedCalls != 1 {
+			t.Errorf("blockConstructedCalls = %d, want 1", app.blockConstructedCalls)
+		}
+	})
+
+	t.Run("undeclared capability — no-op, no error, no dispatch", func(t *testing.T) {
+		// caps is zero. testApp implements MempoolObserver but didn't
+		// declare it, so the server's cap-gating MUST suppress
+		// dispatch — the call counters stay at zero.
+		app := &testApp{}
+		srv := New(app)
+		if _, err := srv.Handshake(context.Background(),
+			types.HandshakeRequest{Genesis: &types.GenesisDoc{ChainID: "test"}}); err != nil {
+			t.Fatalf("handshake: %v", err)
+		}
+		if err := srv.OnBatchCertified(context.Background(), types.BatchCertifiedEvent{}); err != nil {
+			t.Errorf("OnBatchCertified should be a no-op when undeclared, got err=%v", err)
+		}
+		if err := srv.OnBlockConstructed(context.Background(), types.BlockConstructedEvent{}); err != nil {
+			t.Errorf("OnBlockConstructed should be a no-op when undeclared, got err=%v", err)
+		}
+		if app.batchCertifiedCalls != 0 || app.blockConstructedCalls != 0 {
+			t.Errorf("expected zero dispatches when CapMempoolObserver undeclared; got batch=%d block=%d",
+				app.batchCertifiedCalls, app.blockConstructedCalls)
+		}
+	})
 }

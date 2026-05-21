@@ -19,10 +19,11 @@ type Server struct {
 	caps  types.Capabilities
 
 	// Optional interfaces (nil if not supported).
-	proposalCtl bapi.ProposalControl
-	voteExt     bapi.VoteExtender
-	stateSync   bapi.StateSync
-	simulator   bapi.Simulator
+	proposalCtl  bapi.ProposalControl
+	voteExt      bapi.VoteExtender
+	stateSync    bapi.StateSync
+	simulator    bapi.Simulator
+	mempoolObs   bapi.MempoolObserver
 
 	// Last block outcome (held between ExecuteBlock and Commit).
 	mu             sync.Mutex
@@ -41,6 +42,7 @@ func New(app bapi.Lifecycle) *Server {
 	s.voteExt, _ = app.(bapi.VoteExtender)
 	s.stateSync, _ = app.(bapi.StateSync)
 	s.simulator, _ = app.(bapi.Simulator)
+	s.mempoolObs, _ = app.(bapi.MempoolObserver)
 	return s
 }
 
@@ -219,6 +221,40 @@ func (s *Server) AsSimulator() bapi.Simulator {
 	return nil
 }
 
+// AsMempoolObserver returns the MempoolObserver interface or nil.
+func (s *Server) AsMempoolObserver() bapi.MempoolObserver {
+	if s.caps.Has(types.CapMempoolObserver) {
+		return s.mempoolObs
+	}
+	return nil
+}
+
+// OnBatchCertified dispatches to the MempoolObserver if the capability
+// was declared at handshake. No-op (returns nil) when CapMempoolObserver
+// is not in caps — engines that probe the capability explicitly via
+// AsMempoolObserver get the same answer.
+//
+// Safe for concurrent use; the engine may fire callbacks from multiple
+// goroutines.
+func (s *Server) OnBatchCertified(ctx context.Context, ev types.BatchCertifiedEvent) error {
+	if !s.caps.Has(types.CapMempoolObserver) || s.mempoolObs == nil {
+		return nil
+	}
+	s.guard.CheckConcurrent()
+	return s.mempoolObs.OnBatchCertified(ctx, ev)
+}
+
+// OnBlockConstructed dispatches to the MempoolObserver if the
+// capability was declared at handshake. No-op when not declared.
+// Safe for concurrent use.
+func (s *Server) OnBlockConstructed(ctx context.Context, ev types.BlockConstructedEvent) error {
+	if !s.caps.Has(types.CapMempoolObserver) || s.mempoolObs == nil {
+		return nil
+	}
+	s.guard.CheckConcurrent()
+	return s.mempoolObs.OnBlockConstructed(ctx, ev)
+}
+
 // LastOutcome returns the most recent BlockOutcome (between
 // ExecuteBlock and Commit). Returns nil if no outcome is pending.
 func (s *Server) LastOutcome() *types.BlockOutcome {
@@ -237,6 +273,7 @@ func discoverCapabilities(app bapi.Lifecycle, declared types.Capabilities) error
 	_, hasVoteExt := app.(bapi.VoteExtender)
 	_, hasStateSync := app.(bapi.StateSync)
 	_, hasSimulator := app.(bapi.Simulator)
+	_, hasMempoolObs := app.(bapi.MempoolObserver)
 
 	if declared.Has(types.CapProposalControl) && !hasProposal {
 		return fmt.Errorf("github.com/blockberries/bapi: app declared CapProposalControl but does not implement ProposalControl")
@@ -250,6 +287,9 @@ func discoverCapabilities(app bapi.Lifecycle, declared types.Capabilities) error
 	if declared.Has(types.CapSimulation) && !hasSimulator {
 		return fmt.Errorf("github.com/blockberries/bapi: app declared CapSimulation but does not implement Simulator")
 	}
+	if declared.Has(types.CapMempoolObserver) && !hasMempoolObs {
+		return fmt.Errorf("github.com/blockberries/bapi: app declared CapMempoolObserver but does not implement MempoolObserver")
+	}
 
 	// Warn (but don't error) if the app implements an interface but didn't declare it.
 	if !declared.Has(types.CapProposalControl) && hasProposal {
@@ -260,6 +300,9 @@ func discoverCapabilities(app bapi.Lifecycle, declared types.Capabilities) error
 	}
 	if !declared.Has(types.CapStateSync) && hasStateSync {
 		log.Println("github.com/blockberries/bapi: WARNING: app implements StateSync but did not declare it; capability will not be used")
+	}
+	if !declared.Has(types.CapMempoolObserver) && hasMempoolObs {
+		log.Println("github.com/blockberries/bapi: WARNING: app implements MempoolObserver but did not declare it; capability will not be used")
 	}
 	if !declared.Has(types.CapSimulation) && hasSimulator {
 		log.Println("github.com/blockberries/bapi: WARNING: app implements Simulator but did not declare it; capability will not be used")
