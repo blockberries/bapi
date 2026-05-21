@@ -1,233 +1,135 @@
-# BAPI
+# BAPI — Block Application Programming Interface
 
-**Block Application Programming Interface** — a ground-up redesign of the consensus-application boundary for BFT consensus engines.
+The consensus↔application boundary for the Stealth stack. A ground-up
+redesign of ABCI 2.0: smaller surface, capability-oriented, cramberry-encoded.
 
-BAPI replaces ABCI 2.0 with a smaller, capability-oriented interface: 5 required methods cover the full lifecycle, 4 optional interfaces unlock advanced features, and the entire wire format uses deterministic binary serialization via [cramberry](https://github.com/blockberries/cramberry) (no protobuf).
+## What's different from ABCI
 
-## Quick Start
+| ABCI 2.0                           | BAPI                                            |
+|------------------------------------|--------------------------------------------------|
+| `Info`, `InitChain`, `CheckTx`, `PrepareProposal`, `ProcessProposal`, `ExtendVote`, `VerifyVoteExtension`, `FinalizeBlock`, `Commit`, `Query` (10 methods, all required) | 5 required methods + 4 optional capability interfaces |
+| `BeginBlock`, per-tx `DeliverTx`, `EndBlock`, then commit | Single `ExecuteBlock(FinalizedBlock) → BlockOutcome` returns per-tx outcomes + AppHash atomically |
+| Protobuf wire format               | Cramberry wire format (deterministic, smaller)   |
+| Capability negotiation by version  | Capability discovery via Go type assertion      |
 
-### Implement the Lifecycle Interface
-
-Every BAPI application must implement `Lifecycle`:
+## The required interface
 
 ```go
-package myapp
+type Lifecycle interface {
+    Handshake(ctx context.Context, req HandshakeRequest) (HandshakeResponse, error)
+    CheckTx(ctx context.Context, tx Tx, mc MempoolContext) (GateVerdict, error)
+    ExecuteBlock(ctx context.Context, block FinalizedBlock) (BlockOutcome, error)
+    Commit(ctx context.Context) (CommitResult, error)
+    Query(ctx context.Context, query StateQuery) (StateQueryResult, error)
+}
+```
 
+`Handshake` covers both genesis and restart. Cold start: app initializes
+from `req.Genesis`. Warm start: app validates `req.LastCommitID` matches
+its own state, returns its `LastCommitID`.
+
+## Optional capabilities
+
+Discovered at handshake time via Go type assertion on the `Lifecycle`:
+
+- **`ProposalControl`** (`BuildProposal` / `VerifyProposal`) — replaces ABCI
+  PrepareProposal/ProcessProposal.
+- **`VoteExtender`** (`ExtendVote` / `VerifyExtension`).
+- **`StateSync`** (`AvailableSnapshots` / `ExportSnapshot` / `ImportSnapshot`)
+  — channel-based, not chunk-by-chunk.
+- **`Simulator`** (`Simulate`) — read-only execution for fee estimation, etc.
+
+```go
+type Application interface {  // convenience union
+    Lifecycle
+    ProposalControl
+    VoteExtender
+    StateSync
+    Simulator
+}
+```
+
+### Planned: `MempoolObserver`
+
+Forward-looking capability landing as Phase 0.2 of the tokenomics SDK plan
+(`PLAN.md` §7). **Not yet implemented** — listed here so app authors can
+design against the contract.
+
+```go
+// MempoolObserver — opt-in capability. Apps that implement it receive
+// per-validator participation signals fired from raspberry's consensus
+// adapter. Used to drive tokenomics (e.g. batches_certified_v,
+// leader_blocks_v counters per epoch).
+type MempoolObserver interface {
+    // OnBatchCertified fires when a looseberry batch's header is
+    // vote-certified into a DAG round cert.
+    OnBatchCertified(validator types.ValidatorAddress, batchHash []byte, txCount uint32, byteCount uint64)
+    // OnBlockConstructed fires when leaderberry builds a block. Lazy
+    // leaders proposing empty blocks are filtered upstream — this only
+    // fires when len(includedBatchHashes) >= 1.
+    OnBlockConstructed(leader types.ValidatorAddress, includedBatchHashes [][]byte)
+}
+```
+
+Apps that don't implement it observe no behavior change. Apps that do can
+drive a participation tracker and fee-routing destination.
+
+### Note on `GateVerdict.Priority` / `GateVerdict.Sender`
+
+These fields have existed on `GateVerdict` since the type was introduced.
+The looseberry mempool now actually consumes them end-to-end: apps that
+populate `Priority` (higher = first) and `Sender` (same-sender sequencing
+key) get priority-fee mempool ordering for free. See `example/dex/app.go`
+for the canonical pattern.
+
+## Transports
+
+- **`local/`** — in-process `Connection`. Zero serialization. Used by
+  raspberry to call its own application.
+- **`grpc/`** — gRPC server and client with a custom `CramberryCodec`
+  replacing protobuf. Schema in `grpc/schema/bapi/v1/`.
+- **`server/`** — wraps a `Lifecycle` with a `LifecycleGuard` state machine
+  that fail-fasts on protocol violations (e.g. `ExecuteBlock` before
+  `Handshake`).
+
+## Usage
+
+```go
 import (
     "github.com/blockberries/bapi"
-    "github.com/blockberries/bapi/types"
-    "context"
+    bapilocal "github.com/blockberries/bapi/local"
 )
 
-type App struct{}
+type myApp struct{ /* ... */ }
+func (a *myApp) Handshake(ctx, req) (HandshakeResponse, error) { /* ... */ }
+// ... 4 more methods ...
 
-func (a *App) Handshake(ctx context.Context, req types.HandshakeRequest) (types.HandshakeResponse, error) {
-    // Initialize on genesis or report state on restart.
-    if req.LastCommitted == nil {
-        h := types.AppHash{} // your initial app hash
-        return types.HandshakeResponse{AppHash: &h}, nil
-    }
-    // ... report persisted state
-}
-
-func (a *App) CheckTx(ctx context.Context, tx types.Tx, mctx types.MempoolContext) (types.GateVerdict, error) {
-    // Validate transaction for mempool admission.
-    return types.GateVerdict{Code: 0}, nil
-}
-
-func (a *App) ExecuteBlock(ctx context.Context, block types.FinalizedBlock) (types.BlockOutcome, error) {
-    // Deterministically execute all transactions. Do NOT persist to disk.
-    return types.BlockOutcome{AppHash: types.AppHash{0x01}}, nil
-}
-
-func (a *App) Commit(ctx context.Context) (types.CommitResult, error) {
-    // Atomically persist state changes from the last ExecuteBlock.
-    return types.CommitResult{}, nil
-}
-
-func (a *App) Query(ctx context.Context, req types.StateQuery) (types.StateQueryResult, error) {
-    // Read application state.
-    return types.StateQueryResult{}, nil
-}
+conn := bapilocal.NewConnection(&myApp{})
+_, err := conn.Handshake(ctx, bapi.HandshakeRequest{...})
 ```
 
-### Connect In-Process
+## Layout
 
-```go
-import "github.com/blockberries/bapi/local"
-
-conn := local.NewConnection(&App{})
-defer conn.Close()
-
-resp, err := conn.Handshake(ctx, types.HandshakeRequest{
-    Genesis: &types.GenesisDoc{ChainID: "my-chain"},
-})
+```
+bapi/
+├── bapi.go              Lifecycle, ProposalControl, VoteExtender, StateSync, Simulator interfaces
+├── errors.go            Sentinel errors
+├── types/               Concrete types (FinalizedBlock, BlockOutcome, GenesisDoc, ...)
+├── server/              LifecycleGuard, capability discovery
+├── local/               In-process Connection
+├── grpc/                gRPC server, client, codec, service
+│   └── schema/bapi/v1/  .cram schemas + generated code
+├── testing/             MockApp, Harness, RunComplianceSuite
+└── example/
+    ├── counter/         Minimal Lifecycle-only example
+    └── dex/             All-capabilities example
 ```
 
-### Connect Over gRPC
+## Development
 
-```go
-import bapigrpc "github.com/blockberries/bapi/grpc"
+See [`CLAUDE.md`](./CLAUDE.md) for development guidelines.
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) for design details.
 
-// Server
-gs := grpc.NewServer()
-bapigrpc.NewGRPCServer(&App{}).Register(gs)
-gs.Serve(listener)
+## License
 
-// Client
-client, err := bapigrpc.Dial(ctx, "localhost:26658", grpc.WithInsecure())
-defer client.Close()
-
-resp, err := client.Handshake(ctx, types.HandshakeRequest{
-    Genesis: &types.GenesisDoc{ChainID: "my-chain"},
-})
-```
-
-## Interfaces
-
-### Required: Lifecycle
-
-| Method | Purpose | Concurrency |
-|---|---|---|
-| `Handshake` | Bootstrap on genesis or report state on restart | Called once at startup |
-| `CheckTx` | Gate-check transactions for mempool admission | Concurrent |
-| `ExecuteBlock` | Deterministically execute a finalized block | Sequential |
-| `Commit` | Persist state changes to disk | Sequential, after ExecuteBlock |
-| `Query` | Read application state | Concurrent |
-
-### Optional Capabilities
-
-Implement any combination of these interfaces and declare the corresponding capability bits in your `HandshakeResponse`:
-
-| Interface | Bit | Purpose |
-|---|---|---|
-| `ProposalControl` | `CapProposalControl` | Control block contents and ordering |
-| `VoteExtender` | `CapVoteExtensions` | Attach data to precommit votes |
-| `StateSync` | `CapStateSync` | Snapshot-based fast sync |
-| `Simulator` | `CapSimulation` | Dry-run transaction execution |
-
-```go
-func (a *App) Handshake(ctx context.Context, req types.HandshakeRequest) (types.HandshakeResponse, error) {
-    return types.HandshakeResponse{
-        AppHash:      &myHash,
-        Capabilities: types.CapProposalControl | types.CapStateSync,
-    }, nil
-}
-```
-
-The engine validates at handshake that declared capabilities match implemented interfaces. Undeclared but implemented interfaces trigger a warning; declared but unimplemented interfaces cause an error.
-
-## Package Overview
-
-| Package | Description |
-|---|---|
-| `bapi` | Interface definitions (`Lifecycle`, `ProposalControl`, `VoteExtender`, `StateSync`, `Simulator`, `Connection`) |
-| `types/` | 31 domain types with cramberry struct tags for deterministic serialization |
-| `server/` | Engine-side wrapper enforcing the lifecycle state machine |
-| `local/` | In-process adapter (zero serialization overhead) |
-| `grpc/` | gRPC transport using cramberry codec (no protobuf) |
-| `testing/` | `MockApp`, `Harness`, and `RunComplianceSuite` |
-| `example/counter/` | Minimal app: transaction counter (Lifecycle only) |
-| `example/dex/` | Full-featured app: DEX with all 4 optional capabilities |
-
-## Examples
-
-### Counter
-
-A minimal application that counts transactions. Demonstrates `Lifecycle` with no optional capabilities.
-
-```go
-import "github.com/blockberries/bapi/example/counter"
-
-app := counter.New()
-conn := local.NewConnection(app)
-```
-
-See [`example/counter/app.go`](example/counter/app.go).
-
-### DEX
-
-A decentralized exchange demonstrating all optional capabilities: proposal control (oracle price injection), vote extensions (price feeds), state sync (JSON snapshots), and simulation (dry-run execution).
-
-```go
-import "github.com/blockberries/bapi/example/dex"
-
-app := dex.New()
-conn := local.NewConnection(app)
-```
-
-See [`example/dex/app.go`](example/dex/app.go).
-
-## Testing
-
-### Run All Tests
-
-```bash
-make test          # without race detector
-make test-race     # with race detector
-```
-
-### Use the Test Harness
-
-The `testing/` package provides tools for testing your application:
-
-```go
-import bapitest "github.com/blockberries/bapi/testing"
-
-func TestMyApp(t *testing.T) {
-    app := myapp.New()
-    h := bapitest.NewHarness(t, app)
-
-    // Genesis handshake with default parameters.
-    h.GenesisDefault()
-
-    // Execute a block with transactions.
-    tx := types.Tx([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08})
-    outcome := h.ExecuteAndCommit(bapitest.MakeBlock(1, tx))
-
-    // Assert mempool behavior.
-    h.MustAcceptTx(validTx)
-    h.MustRejectTx(invalidTx)
-
-    // Query state.
-    result := h.Query("/my/path", nil)
-}
-```
-
-### Run the Compliance Suite
-
-Verify your application satisfies the BAPI contract:
-
-```go
-func TestCompliance(t *testing.T) {
-    bapitest.RunComplianceSuite(t, func() bapi.Lifecycle {
-        return myapp.New()
-    })
-}
-```
-
-The suite tests genesis handshake, execute/commit cycles, determinism, concurrent access, and transaction outcome correctness.
-
-## Wire Format
-
-BAPI uses [cramberry](https://github.com/blockberries/cramberry) for deterministic binary serialization. All domain types carry `cramberry:"N"` struct tags. The canonical field assignments are documented in:
-
-- [`grpc/schema/bapi/v1/types.cram`](grpc/schema/bapi/v1/types.cram) — Type definitions
-- [`grpc/schema/bapi/v1/service.cram`](grpc/schema/bapi/v1/service.cram) — Service definition
-
-The gRPC transport registers a custom `CramberryCodec` that serializes domain types directly, eliminating the need for protobuf code generation or a type conversion layer.
-
-## Building
-
-```bash
-make build   # go build ./...
-make lint    # golangci-lint (or go vet as fallback)
-make schema  # validate cramberry schemas (if CLI available)
-make clean   # go clean ./...
-```
-
-Requires Go 1.25.6+.
-
-## Architecture
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation of the internal design, including the lifecycle state machine, capability system, transport layers, and type system.
+Apache-2.0.
